@@ -2,15 +2,14 @@ const readlineSync = require('readline-sync');
 const moment = require('moment');
 const axios = require('axios');
 const config = require('./config.json');
+const conversionsFile = ('conversions.json');
+const fs = require('fs');
 
 const apiUrl = 'https://api.fastforex.io/historical';
+const apiKey = config.api_key;
 
 const isValidCurrencyCode = (code) => /^[A-Z]{3}$/.test(code.toUpperCase());
 const isValidAmount = (amount) => !isNaN(amount) && parseFloat(amount).toFixed(2) === amount.toFixed(2);
-
-const apiKey = config.api_key;
-
-
 
 const start = async () => {
     while (true) {
@@ -36,37 +35,37 @@ const start = async () => {
             continue;
         }
 
-
         try {
-
             const rates = await getExchangeRate(dateInput, baseCurrency)
             const result = await convertCurrency(rates, amount, targetCurrency)
             console.log(`${amount} ${baseCurrency} is ${result} ${targetCurrency}`)
-
-
-        } catch {
-
+            const conversion = {
+                dateInput,
+                amount: amount.toFixed(2),
+                base_currency: baseCurrency,
+                target_currency: targetCurrency,
+                converted_amount: result.toFixed(2),
+            };
+            saveConversion(conversion);
+        } catch (error) {
+            console.log(error.message);
         }
+
         const exit = readlineSync.question('Type "END" to exit or press Enter to continue: ');
         if (exit.toUpperCase() === 'END') {
             break;
         }
-        console.log(dateInput, amountInput, baseCurrency, targetCurrency)
-
     }
-
 }
 
-
 const getExchangeRate = async (dateInput, baseCurrency) => {
-
+ 
     const url = `${apiUrl}?date=${dateInput}&from=${baseCurrency}&api_key=${apiKey}`;
     const response = await axios.get(url);
     const rates = response.data.results;
-    // console.log(rates)
+ 
     return rates
 }
-
 
 const convertCurrency = async (rates, amount, targetCurrency) => {
     const rate = rates[targetCurrency];
@@ -76,5 +75,13 @@ const convertCurrency = async (rates, amount, targetCurrency) => {
     return parseFloat((amount * rate).toFixed(2));
 };
 
+const saveConversion = (conversion) => {
+    let conversions = [];
+    if (fs.existsSync(conversionsFile)) {
+        conversions = JSON.parse(fs.readFileSync(conversionsFile));
+    }
+    conversions.push(conversion);
+    fs.writeFileSync(conversionsFile, JSON.stringify(conversions, null, 2));
+};
 
 start()
